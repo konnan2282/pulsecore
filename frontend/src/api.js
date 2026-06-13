@@ -1,7 +1,8 @@
 import axios from 'axios';
 
 const api = axios.create({
-    baseURL: 'http://localhost:5000/api'
+    // ВАША НОВАЯ ОБЛАЧНАЯ ССЫЛКА ИЗ RENDER:
+    baseURL: 'https://pulsecore-api.onrender.com/api'
 });
 
 // Перехватчик: автоматически вставляет токен авторизации из localStorage
