@@ -12,7 +12,7 @@ import api from './api';
 
 // Динамическое определение базового адреса для картинок (локалка / Render)
 const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-const backendUrl = isLocalhost ? 'http://localhost:5000' : 'https://pulsecore-api.onrender.com';
+const backendUrl = isLocalhost ? 'http://localhost:5000' : 'https://pulsecore-vnk4.onrender.com';
 
 // --- ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ---
 
