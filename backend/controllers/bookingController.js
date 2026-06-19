@@ -57,6 +57,45 @@ class BookingController {
         }
     }
 
+    
+    async cancel(req, res) {
+        const { id } = req.params;
+        const client_id = req.user.id;
+        const t = await sequelize.transaction();
+
+        try {
+            const booking = await Booking.findOne({ where: { id, client_id }, transaction: t });
+            if (!booking) {
+                await t.rollback();
+                return res.status(404).json({ message: 'Запись не найдена' });
+            }
+
+            if (booking.status === 'canceled') {
+                await t.rollback();
+                return res.status(400).json({ message: 'Запись уже отменена' });
+            }
+
+            // Меняем статус записи
+            booking.status = 'canceled';
+            await booking.save({ transaction: t });
+
+            // Возвращаем занятие на абонемент (если это не безлимит)
+            if (booking.membership_id) {
+                const membership = await Membership.findByPk(booking.membership_id, { transaction: t });
+                if (membership && membership.visits_left !== null && membership.visits_total !== 999) {
+                    await membership.increment('visits_left', { by: 1, transaction: t });
+                }
+            }
+
+            await t.commit();
+            return res.json({ message: 'Запись успешно отменена, занятие возвращено на абонемент.', booking });
+        } catch (e) {
+            await t.rollback();
+            console.log(e);
+            res.status(500).json({ message: 'Ошибка при отмене записи' });
+        }
+    }
+
     async getMy(req, res) {
         try {
             const bookings = await Booking.findAll({
@@ -69,7 +108,6 @@ class BookingController {
         }
     }
 
-    // НОВЫЙ МЕТОД: Получение записей на конкретную тренировку (для тренера)
     async getByWorkout(req, res) {
         try {
             const { workoutId } = req.params;
@@ -83,11 +121,10 @@ class BookingController {
         }
     }
 
-    // НОВЫЙ МЕТОД: Отметка посещаемости тренером (Глава 3.4)
     async updateStatus(req, res) {
         try {
             const { id } = req.params;
-            const { status } = req.body; // 'attended' (посетил) или 'missed' (пропустил)
+            const { status } = req.body;
             const booking = await Booking.findByPk(id);
             if (!booking) {
                 return res.status(404).json({ message: 'Запись не найдена' });

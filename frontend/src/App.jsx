@@ -4,11 +4,15 @@ import { HashRouter as Router, Routes, Route, Link, useNavigate, useParams, Navi
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   LayoutDashboard, Calendar, TrendingUp, Users, FileText, 
-  LogOut, Bell, ChevronRight, Activity, Zap, Plus, History
+  LogOut, Bell, ChevronRight, Activity, Zap, Plus, History, Key, UserCheck, Trash2
 } from 'lucide-react';
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import api from './api';
+
+// Динамическое определение базового адреса для картинок (локалка / Render)
+const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+const backendUrl = isLocalhost ? 'http://localhost:5000' : 'https://pulsecore-api.onrender.com';
 
 // --- ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ---
 
@@ -26,7 +30,8 @@ const getWorkoutImage = (title) => {
 const ProgressRing = ({ progress, size = 120, stroke = 8, color = "#2563eb", label = "" }) => {
   const radius = (size - stroke) / 2;
   const circumference = radius * 2 * Math.PI;
-  const offset = circumference - (progress / 100) * circumference;
+  const safeProgress = Math.max(0, Math.min(100, progress || 0));
+  const offset = circumference - (safeProgress / 100) * circumference;
 
   return (
     <div className="flex flex-col items-center justify-center relative" style={{ width: size, height: size }}>
@@ -40,7 +45,7 @@ const ProgressRing = ({ progress, size = 120, stroke = 8, color = "#2563eb", lab
         />
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center">
-        <span className="text-xl font-black">{Math.round(progress)}%</span>
+        <span className="text-xl font-black">{Math.round(safeProgress)}%</span>
         <span className="text-[10px] text-slate-400 uppercase font-bold">{label}</span>
       </div>
     </div>
@@ -88,7 +93,7 @@ const DynamicWeightChart = ({ logs }) => {
   );
 };
 
-// --- ПУБЛИЧНАЯ ЗОНА (Сайт-витрина) ---
+// --- НАВИГАЦИЯ ---
 
 function Navbar({ token, user, handleLogout }) {
   const navigate = useNavigate();
@@ -376,51 +381,138 @@ function DetailPage({ handleBook, token }) {
   );
 }
 
-// --- СТРАНИЦА ВХОДА ---
-function LoginPage({ handleLogin, error }) {
+// --- СТРАНИЦА ВХОДА И РЕГИСТРАЦИИ ---
+function LoginPage({ handleLogin, handleRegister, error }) {
+  const [isRegister, setIsRegister] = useState(false);
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [fullName, setFullName] = useState('');
+  const [phone, setPhone] = useState('');
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    if (isRegister) {
+      if (password !== confirmPassword) {
+        toast.error('Пароли не совпадают!');
+        return;
+      }
+      handleRegister(e, username, password, fullName, phone);
+    } else {
+      handleLogin(e, username, password);
+    }
+  };
 
   return (
     <div className="h-screen w-full flex items-center justify-center bg-slate-900 p-4">
       <motion.div 
-        initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }}
-        className="bg-white p-10 rounded-[40px] shadow-2xl w-full max-w-md space-y-8"
+        layout
+        initial={{ opacity: 0, scale: 0.95 }} 
+        animate={{ opacity: 1, scale: 1 }}
+        transition={{ duration: 0.3 }}
+        className="bg-white p-8 rounded-[40px] shadow-2xl w-full max-w-md space-y-6"
       >
         <div className="text-center">
-          <div className="w-16 h-16 bg-blue-600 rounded-3xl flex items-center justify-center shadow-2xl shadow-blue-500/40 mx-auto mb-6">
-            <Zap size={32} fill="white" />
+          <div className="w-14 h-14 bg-blue-600 rounded-2xl flex items-center justify-center shadow-lg shadow-blue-500/35 mx-auto mb-3">
+            <Zap size={28} fill="white" className="text-white" />
           </div>
-          <h1 className="text-4xl font-black text-slate-900 tracking-tight">PulseCore</h1>
-          <p className="text-slate-400 mt-2 font-medium">Вход в закрытую систему</p>
+          <h1 className="text-3xl font-black text-slate-900 tracking-tight">PulseCore</h1>
+          <p className="text-slate-400 mt-1 font-medium text-xs uppercase tracking-wider">
+            {isRegister ? 'Регистрационная форма' : 'Вход в закрытую систему'}
+          </p>
+        </div>
+
+        {/* ПЕРЕКЛЮЧАТЕЛЬ РЕЖИМА */}
+        <div className="bg-slate-100 p-1 rounded-2xl flex relative">
+          <button 
+            type="button"
+            onClick={() => { setIsRegister(false); }}
+            className={`flex-1 py-2 rounded-xl text-xs font-bold transition-all relative z-10 ${!isRegister ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-900'}`}
+          >
+            Вход
+          </button>
+          <button 
+            type="button"
+            onClick={() => { setIsRegister(true); }}
+            className={`flex-1 py-2 rounded-xl text-xs font-bold transition-all relative z-10 ${isRegister ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-900'}`}
+          >
+            Регистрация
+          </button>
         </div>
         
-        <form onSubmit={(e) => handleLogin(e, username, password)} className="space-y-5">
-          <input 
-            type="text" value={username} onChange={(e)=>setUsername(e.target.value)} 
-            placeholder="Ваш логин" className="w-full p-4 bg-slate-50 border-none rounded-2xl focus:ring-2 focus:ring-blue-500 outline-none transition" 
-          />
-          <input 
-            type="password" value={password} onChange={(e)=>setPassword(e.target.value)} 
-            placeholder="Пароль" className="w-full p-4 bg-slate-50 border-none rounded-2xl focus:ring-2 focus:ring-blue-500 outline-none transition" 
-          />
-          <button type="submit" className="w-full bg-blue-600 text-white p-4 rounded-2xl font-black text-lg hover:bg-slate-900 transition-all shadow-xl shadow-blue-500/20">
-            Войти
+        <form onSubmit={handleSubmit} className="space-y-3.5">
+          <div>
+            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Логин (Уникальный)</label>
+            <input 
+              type="text" value={username} onChange={(e)=>setUsername(e.target.value)} required
+              placeholder="Введите логин" className="w-full p-3.5 bg-slate-50 border border-slate-100 rounded-2xl focus:ring-2 focus:ring-blue-500 focus:bg-white outline-none transition text-sm text-slate-800" 
+            />
+          </div>
+
+          <div className="grid grid-cols-1 gap-3.5">
+            <div>
+              <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Пароль</label>
+              <input 
+                type="password" value={password} onChange={(e)=>setPassword(e.target.value)} required
+                placeholder="Минимум 6 символов" className="w-full p-3.5 bg-slate-50 border border-slate-100 rounded-2xl focus:ring-2 focus:ring-blue-500 focus:bg-white outline-none transition text-sm text-slate-800" 
+              />
+            </div>
+
+            {isRegister && (
+              <div className="animate-fadeIn">
+                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Подтвердите пароль</label>
+                <input 
+                  type="password" value={confirmPassword} onChange={(e)=>setConfirmPassword(e.target.value)} required
+                  placeholder="Повторите пароль" className="w-full p-3.5 bg-slate-50 border border-slate-100 rounded-2xl focus:ring-2 focus:ring-blue-500 focus:bg-white outline-none transition text-sm text-slate-800" 
+                />
+              </div>
+            )}
+          </div>
+
+          <AnimatePresence>
+            {isRegister && (
+              <motion.div 
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: 'auto', opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                className="space-y-3.5 overflow-hidden"
+              >
+                <div>
+                  <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1">ФИО полностью</label>
+                  <input 
+                    type="text" value={fullName} onChange={(e)=>setFullName(e.target.value)} required
+                    placeholder="Иванов Иван Иванович" className="w-full p-3.5 bg-slate-50 border border-slate-100 rounded-2xl focus:ring-2 focus:ring-blue-500 focus:bg-white outline-none transition text-sm text-slate-800" 
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Номер телефона</label>
+                  <input 
+                    type="text" value={phone} onChange={(e)=>setPhone(e.target.value)} required
+                    placeholder="+7 (999) 000-00-00" className="w-full p-3.5 bg-slate-50 border border-slate-100 rounded-2xl focus:ring-2 focus:ring-blue-500 focus:bg-white outline-none transition text-sm text-slate-800" 
+                  />
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          <button type="submit" className="w-full bg-blue-600 text-white p-4 rounded-2xl font-black text-md hover:bg-slate-900 transition-all shadow-lg shadow-blue-500/20 mt-4 flex items-center justify-center gap-2">
+            {isRegister ? <UserCheck size={18} /> : <Key size={18} />}
+            {isRegister ? 'Создать аккаунт' : 'Авторизоваться'}
           </button>
-          {error && <p className="text-sm text-red-500 text-center font-bold">{error}</p>}
+          
+          {error && <p className="text-xs text-red-500 text-center font-bold bg-red-50 py-2 rounded-xl border border-red-100">{error}</p>}
         </form>
         
-        <div className="text-center mt-4">
-          <Link to="/" className="text-sm text-blue-600 font-bold hover:underline">&larr; Вернуться на главную</Link>
+        <div className="text-center mt-2">
+          <Link to="/" className="text-xs text-blue-600 font-bold hover:underline">&larr; Вернуться на главную страницу</Link>
         </div>
       </motion.div>
     </div>
   );
 }
 
-// --- ПРИВАТНАЯ ЗОНА (КАБИНЕТЫ) ---
+// --- ПРИВАТНАЯ ЗОНА ---
 
-// Лейаут с левым черным меню (Сайдбаром)
 function CabinetLayout({ children, user, handleLogout }) {
   const navigate = useNavigate();
   return (
@@ -438,7 +530,6 @@ function CabinetLayout({ children, user, handleLogout }) {
             <LayoutDashboard size={22} className="text-blue-400" />
             <span className="hidden lg:block text-sm font-bold text-white">Рабочий стол</span>
           </Link>
-          {/* КНОПКА ВОЗВРАТА В ПУБЛИЧНЫЙ КАТАЛОГ */}
           <Link to="/" className="flex items-center gap-4 p-3 rounded-2xl hover:bg-white/10 transition-colors group mt-4">
             <Calendar size={22} className="text-slate-400 group-hover:text-blue-400 transition-colors" />
             <span className="hidden lg:block text-sm font-medium text-slate-300 group-hover:text-white">Каталог тренировок</span>
@@ -477,8 +568,8 @@ function CabinetLayout({ children, user, handleLogout }) {
   );
 }
 
-// Дашборд Клиента
-function ClientDashboard({ user, membership, bookings, workouts, handleBook }) {
+// ДАШБОРД КЛИЕНТА (С замерами, загрузкой, карточками на ховере и лайтбоксом удаления)
+function ClientDashboard({ user, membership, bookings, workouts, handleBook, setMembership, setBookings }) {
   const [activeTab, setActiveTab] = useState('overview');
   const [progressLogs, setProgressLogs] = useState([]);
   const [weight, setWeight] = useState('');
@@ -486,6 +577,9 @@ function ClientDashboard({ user, membership, bookings, workouts, handleBook }) {
   const [muscleMass, setMuscleMass] = useState('');
   const [notes, setNotes] = useState('');
   const [photo, setPhoto] = useState(null);
+  const [photoPreview, setPhotoPreview] = useState(null);
+  const [selectedPhoto, setSelectedPhoto] = useState(null); // Стейт для интерактивного лайтбокса
+  
   const navigate = useNavigate();
 
   const loadProgress = async () => {
@@ -509,15 +603,45 @@ function ClientDashboard({ user, membership, bookings, workouts, handleBook }) {
     try {
       await api.post('/progress', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
       toast.success('Замер сохранен!');
-      setWeight(''); setBodyFat(''); setMuscleMass(''); setNotes(''); setPhoto(null);
+      setWeight(''); setBodyFat(''); setMuscleMass(''); setNotes(''); setPhoto(null); setPhotoPreview(null);
       loadProgress();
-    } catch (err) { toast.error('Ошибка сохранения замера'); }
+    } catch (err) { 
+      const exactError = err.response?.data?.error || err.response?.data?.message;
+      toast.error(exactError || 'Ошибка сохранения замера'); 
+    }
+  };
+
+  const handleCancelBooking = async (bookingId) => {
+    try {
+      const res = await api.put(`/booking/${bookingId}/cancel`);
+      toast.success(res.data.message);
+      const [mem, book] = await Promise.all([api.get('/membership/my'), api.get('/booking/my')]);
+      setMembership(mem.data);
+      setBookings(book.data);
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Ошибка при отмене записи');
+    }
+  };
+
+  // Удаление замера прогресса
+  const handleDeleteProgress = async (id) => {
+    if (!window.confirm('Вы уверены, что хотите окончательно удалить этот замер и фотографию формы?')) {
+      return;
+    }
+    try {
+      const res = await api.delete(`/progress/${id}`);
+      toast.success(res.data.message);
+      setSelectedPhoto(null); // Закрываем лайтбокс
+      loadProgress(); // Перезагружаем список
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Не удалось удалить замер');
+    }
   };
 
   const progress = membership ? (membership.visits_left / membership.visits_total) * 100 : 0;
 
   return (
-    <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="space-y-8 w-full">
+    <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="space-y-8 w-full relative">
       <div className="flex border-b border-slate-200 gap-6">
         <button onClick={() => setActiveTab('overview')} className={`pb-3 font-bold text-sm transition-all ${activeTab === 'overview' ? 'border-b-2 border-blue-600 text-blue-600' : 'text-slate-400'}`}>Обзор кабинета</button>
         <button onClick={() => setActiveTab('progress')} className={`pb-3 font-bold text-sm transition-all ${activeTab === 'progress' ? 'border-b-2 border-blue-600 text-blue-600' : 'text-slate-400'}`}>Мой прогресс (Замеры и Фото)</button>
@@ -567,9 +691,17 @@ function ClientDashboard({ user, membership, bookings, workouts, handleBook }) {
                         </div>
                         <div>
                           <p className="font-bold text-slate-800">{b.workout?.title}</p>
-                          <p className="text-xs text-slate-400">Статус: <span className="text-blue-600 font-bold uppercase">{b.status === 'registered' ? 'Записан' : b.status === 'attended' ? 'Посетил' : 'Пропустил'}</span></p>
+                          <p className="text-xs text-slate-400">Статус: <span className="text-blue-600 font-bold uppercase">{b.status === 'registered' ? 'Записан' : b.status === 'attended' ? 'Посетил' : b.status === 'canceled' ? 'Отменен' : 'Пропустил'}</span></p>
                         </div>
                       </div>
+                      {b.status === 'registered' && (
+                        <button 
+                          onClick={() => handleCancelBooking(b.id)}
+                          className="bg-red-100 hover:bg-red-200 text-red-600 text-xs font-bold py-1.5 px-4 rounded-xl transition"
+                        >
+                          Отменить
+                        </button>
+                      )}
                     </div>
                   ))}
                   {bookings.length === 0 && <p className="text-slate-400 italic">У вас еще нет записей на тренировки.</p>}
@@ -598,30 +730,105 @@ function ClientDashboard({ user, membership, bookings, workouts, handleBook }) {
           </motion.div>
         ) : (
           <motion.div key="progress" className="grid grid-cols-1 lg:grid-cols-3 gap-8 w-full">
-            <div className="bg-white rounded-3xl p-8 shadow-sm border border-slate-100 h-fit">
-              <h3 className="text-xl font-bold mb-6 flex items-center gap-2">
+            {/* ФОРМА СОХРАНЕНИЯ ЗАМЕРА */}
+            <div className="bg-white rounded-3xl p-8 shadow-sm border border-slate-100 h-fit space-y-4">
+              <h3 className="text-xl font-bold mb-2 flex items-center gap-2">
                 <Plus size={20} className="text-blue-600" /> Новый замер тела
               </h3>
               <form onSubmit={handleProgressSubmit} className="space-y-4">
-                <div><label className="block text-xs font-bold text-slate-400 uppercase mb-1">Вес (кг)</label><input type="number" step="0.1" value={weight} onChange={e=>setWeight(e.target.value)} required className="w-full p-3 bg-slate-50 rounded-xl outline-none" /></div>
+                <div><label className="block text-xs font-bold text-slate-400 uppercase mb-1">Вес (кг)</label><input type="number" step="0.1" value={weight} onChange={e=>setWeight(e.target.value)} required className="w-full p-3.5 bg-slate-50 border border-slate-100 rounded-xl outline-none text-sm focus:ring-2 focus:ring-blue-500 focus:bg-white transition" /></div>
                 <div className="grid grid-cols-2 gap-4">
-                  <div><label className="block text-xs font-bold text-slate-400 uppercase mb-1">Жир %</label><input type="number" step="0.1" value={bodyFat} onChange={e=>setBodyFat(e.target.value)} required className="w-full p-3 bg-slate-50 rounded-xl outline-none" /></div>
-                  <div><label className="block text-xs font-bold text-slate-400 uppercase mb-1">Мышцы %</label><input type="number" step="0.1" value={muscleMass} onChange={e=>setMuscleMass(e.target.value)} required className="w-full p-3 bg-slate-50 rounded-xl outline-none" /></div>
+                  <div><label className="block text-xs font-bold text-slate-400 uppercase mb-1">Жир %</label><input type="number" step="0.1" value={bodyFat} onChange={e=>setBodyFat(e.target.value)} required className="w-full p-3.5 bg-slate-50 border border-slate-100 rounded-xl outline-none text-sm focus:ring-2 focus:ring-blue-500 focus:bg-white transition" /></div>
+                  <div><label className="block text-xs font-bold text-slate-400 uppercase mb-1">Мышцы %</label><input type="number" step="0.1" value={muscleMass} onChange={e=>setMuscleMass(e.target.value)} required className="w-full p-3.5 bg-slate-50 border border-slate-100 rounded-xl outline-none text-sm focus:ring-2 focus:ring-blue-500 focus:bg-white transition" /></div>
                 </div>
-                <div><label className="block text-xs font-bold text-slate-400 uppercase mb-1">Фото формы</label><input type="file" onChange={e=>setPhoto(e.target.files[0])} className="text-xs" /></div>
+
+                {/* ЗАМЕТКИ */}
+                <div>
+                  <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Заметки / Описание замера</label>
+                  <textarea 
+                    value={notes} onChange={e=>setNotes(e.target.value)} 
+                    placeholder="Например: силовые растут, чувствую бодрость..."
+                    className="w-full p-3 bg-slate-50 border border-slate-100 rounded-xl outline-none text-sm h-16 resize-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition"
+                  />
+                </div>
+
+                {/* СТИЛЬНЫЙ ДРАГ-ЭНД-ДРОП */}
+                <div className="space-y-2">
+                  <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Фотография формы</label>
+                  <div className="relative border-2 border-dashed border-slate-200 hover:border-blue-500 rounded-2xl p-4 flex flex-col items-center justify-center cursor-pointer transition bg-slate-50/50 group">
+                    <input 
+                      type="file" 
+                      onChange={(e) => {
+                        const file = e.target.files[0];
+                        setPhoto(file);
+                        if (file) {
+                          setPhotoPreview(URL.createObjectURL(file));
+                        } else {
+                          setPhotoPreview(null);
+                        }
+                      }}
+                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" 
+                    />
+                    {photoPreview ? (
+                      <div className="relative w-full h-32 rounded-xl overflow-hidden">
+                        <img src={photoPreview} alt="Preview" className="w-full h-full object-cover" />
+                        <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition text-white text-xs font-bold">
+                          Заменить фото
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="text-center py-2 space-y-1">
+                        <Plus size={20} className="text-slate-400 mx-auto group-hover:text-blue-500 group-hover:scale-110 transition" />
+                        <p className="text-xs font-bold text-slate-500">Добавить фото прогресса</p>
+                        <p className="text-[10px] text-slate-400">PNG, JPG или WEBP</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
                 <button type="submit" className="w-full bg-blue-600 text-white p-3 rounded-xl font-bold text-sm hover:bg-blue-700 transition">Сохранить замер</button>
               </form>
             </div>
 
+            {/* ГРАФИК И КРАСИВАЯ ИНТЕРАКТИВНАЯ ГАЛЕРЕЯ */}
             <div className="lg:col-span-2 space-y-8">
               <div className="bg-white rounded-3xl p-8 shadow-sm border border-slate-100"><h3 className="text-xl font-bold mb-6 flex items-center gap-2"><Activity size={20} className="text-blue-600" /> Динамика веса</h3><div className="h-40 w-full"><DynamicWeightChart logs={progressLogs} /></div></div>
-              <div className="bg-white rounded-3xl p-8 shadow-sm border border-slate-100"><h3 className="text-xl font-bold mb-6 flex items-center gap-2"><History size={20} className="text-blue-600" /> Галерея формы</h3>
-                <div className="grid grid-cols-3 gap-4">
+              
+              <div className="bg-white rounded-3xl p-8 shadow-sm border border-slate-100">
+                <h3 className="text-xl font-bold mb-6 flex items-center gap-2"><History size={20} className="text-blue-600" /> Галерея формы</h3>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-6">
                   {progressLogs.filter(l => l.photo_url).map(l => (
-                    <div key={l.id} className="relative rounded-2xl overflow-hidden border border-slate-100">
-                      <img src={`http://localhost:5000${l.photo_url}`} alt="Progress" className="w-full h-32 object-cover" />
-                      <div className="absolute inset-x-0 bottom-0 bg-black/60 p-2 text-white text-[10px] font-bold text-center">{new Date(l.log_date).toLocaleDateString()}</div>
-                    </div>
+                    <motion.div 
+                      key={l.id} 
+                      whileHover={{ y: -4 }}
+                      onClick={() => setSelectedPhoto(l)}
+                      className="relative rounded-2xl overflow-hidden border border-slate-100 bg-white group cursor-pointer shadow-sm hover:shadow-md transition-all duration-300"
+                    >
+                      {/* ФОТО */}
+                      <img src={`${backendUrl}${l.photo_url}`} alt="Progress" className="w-full h-40 object-cover" />
+                      
+                      {/* БЕЙДЖ С ДАТОЙ */}
+                      <div className="absolute top-2 left-2 bg-slate-900/80 backdrop-blur-sm text-white text-[9px] font-bold px-2 py-1 rounded-lg">
+                        {new Date(l.log_date).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' })}
+                      </div>
+
+                      {/* ПЛАШКА С ХАРАКТЕРИСТИКАМИ ВНИЗУ */}
+                      <div className="absolute bottom-2 inset-x-2 bg-white/95 backdrop-blur-md p-2 rounded-xl border border-slate-100 flex justify-around text-[9px] font-bold text-slate-700 shadow-sm opacity-90 group-hover:opacity-100 transition-all">
+                        <div>⚖️ <span className="text-slate-900 font-extrabold">{l.weight}</span> кг</div>
+                        <div>💧 <span className="text-slate-900 font-extrabold">{l.body_fat_pct}%</span></div>
+                      </div>
+
+                      {/* ЭФФЕКТ НАВЕДЕНИЯ (Оверлей) */}
+                      <div className="absolute inset-0 bg-blue-900/80 backdrop-blur-xs flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300 text-white p-4 text-center">
+                        <p className="text-xs uppercase font-black tracking-wider text-blue-300">Замер от {new Date(l.log_date).toLocaleDateString()}</p>
+                        <div className="mt-2 space-y-1 text-xs font-semibold">
+                          <p>Вес: {l.weight} кг</p>
+                          <p>Жир: {l.body_fat_pct}%</p>
+                          <p>Мышцы: {l.muscle_mass}%</p>
+                        </div>
+                        <p className="text-[10px] font-bold mt-3 underline text-white/90">Посмотреть детали &rarr;</p>
+                      </div>
+                    </motion.div>
                   ))}
                 </div>
               </div>
@@ -629,14 +836,105 @@ function ClientDashboard({ user, membership, bookings, workouts, handleBook }) {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* МОДЕРН ЛАЙТБОКС */}
+      <AnimatePresence>
+        {selectedPhoto && (
+          <motion.div 
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+            onClick={() => setSelectedPhoto(null)}
+          >
+            <motion.div 
+              initial={{ scale: 0.95, y: 20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.95, y: 20 }}
+              className="bg-white max-w-3xl w-full rounded-[32px] overflow-hidden shadow-2xl flex flex-col md:flex-row max-h-[85vh] border border-slate-100"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Фотография */}
+              <div className="md:w-1/2 bg-slate-950 flex items-center justify-center max-h-[40vh] md:max-h-[85vh]">
+                <img src={`${backendUrl}${selectedPhoto.photo_url}`} alt="Progress Detail" className="w-full h-full object-contain" />
+              </div>
+
+              {/* Детализированное описание */}
+              <div className="md:w-1/2 p-8 flex flex-col justify-between space-y-6">
+                <div className="space-y-6">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <span className="text-[10px] font-black uppercase tracking-wider text-blue-600 bg-blue-50 px-2.5 py-1 rounded-md">
+                        История прогресса
+                      </span>
+                      <h4 className="text-2xl font-black text-slate-900 mt-2">
+                        Замер от {new Date(selectedPhoto.log_date).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' })}
+                      </h4>
+                    </div>
+                    <button 
+                      onClick={() => setSelectedPhoto(null)} 
+                      className="text-xs font-bold text-slate-400 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 w-8 h-8 rounded-full flex items-center justify-center transition"
+                    >
+                      ✕
+                    </button>
+                  </div>
+
+                  {/* Сетка показателей */}
+                  <div className="grid grid-cols-3 gap-4 bg-slate-50 p-4 rounded-2xl border border-slate-100">
+                    <div className="text-center">
+                      <span className="text-[9px] font-bold text-slate-400 uppercase">Вес</span>
+                      <p className="text-lg font-black text-slate-800 mt-1">{selectedPhoto.weight} кг</p>
+                    </div>
+                    <div className="text-center border-x border-slate-200">
+                      <span className="text-[9px] font-bold text-slate-400 uppercase">Жир %</span>
+                      <p className="text-lg font-black text-slate-800 mt-1">{selectedPhoto.body_fat_pct}%</p>
+                    </div>
+                    <div className="text-center">
+                      <span className="text-[9px] font-bold text-slate-400 uppercase">Мышцы %</span>
+                      <p className="text-lg font-black text-slate-800 mt-1">{selectedPhoto.muscle_mass}%</p>
+                    </div>
+                  </div>
+
+                  {/* Описание/Заметки */}
+                  <div className="space-y-2">
+                    <span className="text-[10px] font-bold text-slate-400 uppercase block tracking-wider">Заметки за день:</span>
+                    <p className="text-xs text-slate-500 leading-relaxed italic bg-slate-50/50 p-4 rounded-2xl border border-slate-100 max-h-32 overflow-y-auto">
+                      {selectedPhoto.notes || 'Комментарии или заметки к этому замеру отсутствуют.'}
+                    </p>
+                  </div>
+                </div>
+
+                {/* УЛУЧШЕННАЯ КНОПОЧНАЯ ПАНЕЛЬ С КНОПКОЙ УДАЛЕНИЯ */}
+                <div className="flex gap-3">
+                  <button 
+                    onClick={() => setSelectedPhoto(null)} 
+                    className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-3.5 rounded-2xl text-xs transition"
+                  >
+                    Закрыть
+                  </button>
+                  <button 
+                    onClick={() => handleDeleteProgress(selectedPhoto.id)} 
+                    className="flex-1 bg-red-600 hover:bg-red-700 text-white font-bold py-3.5 rounded-2xl text-xs transition flex items-center justify-center gap-1.5 shadow-md shadow-red-500/10"
+                  >
+                    <Trash2 size={14} /> Удалить замер
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </motion.div>
   );
 }
 
-// Дашборд Тренера
+// Дашборд Тренера (Добавлена форма создания тренировок)
 function TrainerPage({ user, workouts }) {
   const [selectedWorkout, setSelectedWorkout] = useState(null);
   const [bookings, setBookings] = useState([]);
+  const [showCreateForm, setShowCreateForm] = useState(false);
+  
+  const [title, setTitle] = useState('');
+  const [description, setDescription] = useState('');
+  const [startTime, setStartTime] = useState('');
+  const [endTime, setEndTime] = useState('');
+  const [capacity, setCapacity] = useState(10);
 
   const loadBookings = async (workoutId) => {
     try {
@@ -651,12 +949,54 @@ function TrainerPage({ user, workouts }) {
       await api.put(`/booking/${bookingId}`, { status });
       toast.success('Статус посещения обновлен!');
       loadBookings(selectedWorkout);
-    } catch (err) { toast.error('Ошибка при обновлении статуса'); }
+    } catch (err) { toast.error('Ошибка при оновлении статуса'); }
+  };
+
+  const handleCreateWorkout = async (e) => {
+    e.preventDefault();
+    try {
+      await api.post('/workout', { title, description, start_time: startTime, end_time: endTime, capacity });
+      toast.success('Расписание успешно пополнено тренировкой!');
+      setTitle(''); setDescription(''); setStartTime(''); setEndTime(''); setCapacity(10);
+      setShowCreateForm(false);
+      setTimeout(() => window.location.reload(), 1000);
+    } catch (err) {
+      toast.error('Не удалось добавить тренировку в расписание');
+    }
   };
 
   return (
     <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="space-y-8 w-full">
-      <div><h1 className="text-3xl font-black text-slate-800">Журнал тренера 🏋️</h1><p className="text-slate-500">Отмечайте присутствие клиентов.</p></div>
+      <div className="flex justify-between items-center">
+        <div>
+          <h1 className="text-3xl font-black text-slate-800">Журнал тренера 🏋️</h1>
+          <p className="text-slate-500">Добавляйте слоты и отмечайте присутствие.</p>
+        </div>
+        <button 
+          onClick={() => setShowCreateForm(!showCreateForm)}
+          className="bg-blue-600 text-white font-bold py-2 px-5 rounded-2xl text-xs hover:bg-blue-700 transition flex items-center gap-1.5 shadow-md shadow-blue-500/20"
+        >
+          <Plus size={16} /> {showCreateForm ? 'Скрыть форму' : 'Добавить слот'}
+        </button>
+      </div>
+
+      <AnimatePresence>
+        {showCreateForm && (
+          <motion.form 
+            initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }}
+            onSubmit={handleCreateWorkout} className="bg-white p-8 rounded-3xl shadow-sm border border-slate-100 grid grid-cols-1 md:grid-cols-2 gap-4"
+          >
+            <div className="md:col-span-2"><h3 className="font-bold text-slate-800 text-lg mb-2">Создание новой тренировки</h3></div>
+            <div><label className="block text-xs font-bold text-slate-400 uppercase mb-1">Название занятия</label><input type="text" value={title} onChange={e=>setTitle(e.target.value)} required placeholder="Кроссфит, Йога, etc." className="w-full p-3 bg-slate-50 rounded-xl outline-none text-sm" /></div>
+            <div><label className="block text-xs font-bold text-slate-400 uppercase mb-1">Максимум мест (Вместимость)</label><input type="number" value={capacity} onChange={e=>setCapacity(e.target.value)} required min="1" className="w-full p-3 bg-slate-50 rounded-xl outline-none text-sm" /></div>
+            <div><label className="block text-xs font-bold text-slate-400 uppercase mb-1">Время начала</label><input type="datetime-local" value={startTime} onChange={e=>setStartTime(e.target.value)} required className="w-full p-3 bg-slate-50 rounded-xl outline-none text-sm" /></div>
+            <div><label className="block text-xs font-bold text-slate-400 uppercase mb-1">Время окончания</label><input type="datetime-local" value={endTime} onChange={e=>setEndTime(e.target.value)} required className="w-full p-3 bg-slate-50 rounded-xl outline-none text-sm" /></div>
+            <div className="md:col-span-2"><label className="block text-xs font-bold text-slate-400 uppercase mb-1">Описание тренировки</label><textarea value={description} onChange={e=>setDescription(e.target.value)} placeholder="Напишите пару слов о плане тренировки..." className="w-full p-3 bg-slate-50 rounded-xl outline-none text-sm h-24 resize-none" /></div>
+            <div className="md:col-span-2 flex justify-end"><button type="submit" className="bg-blue-600 text-white font-black px-6 py-3 rounded-2xl text-xs hover:bg-blue-700 transition">Опубликовать тренировку</button></div>
+          </motion.form>
+        )}
+      </AnimatePresence>
+
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         <div className="bg-white rounded-3xl p-8 shadow-sm border border-slate-100"><h3 className="text-xl font-bold mb-6 flex items-center gap-2"><Calendar size={20} className="text-blue-600" /> Ваши тренировки</h3>
           <div className="space-y-3">
@@ -683,7 +1023,7 @@ function TrainerPage({ user, workouts }) {
                       </div>
                     )}
                   </div>
-                )) : <p className="text-slate-400 italic">Пусто</p>}
+                )) : <p className="text-slate-400 italic">На это занятие еще никто не записался.</p>}
               </div>
             </motion.div>
           )}
@@ -693,13 +1033,19 @@ function TrainerPage({ user, workouts }) {
   );
 }
 
-// Дашборд Администратора
+// Дашборд Администратора (С функциями выдачи, продления +6/+12 и обнуления)
 function AdminPage() {
   const [stats, setStats] = useState(null);
   const [clients, setClients] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedClientId, setSelectedClientId] = useState(null);
+
+  const [showIssueForm, setShowIssueForm] = useState(false);
+  const [mType, setMType] = useState('Классический (12 занятий)');
+  const [mStartDate, setMStartDate] = useState('');
+  const [mEndDate, setMEndDate] = useState('');
+  const [mVisits, setMVisits] = useState(12);
 
   const loadAdminData = async () => {
     try {
@@ -722,17 +1068,59 @@ function AdminPage() {
     } catch (e) { toast.error('Ошибка при генерации отчета'); }
   };
 
-  const handleRenewMembership = async () => {
+  // Продление абонемента (принимает visits: 6 или 12)
+  const handleRenewMembership = async (visitsCount) => {
     if (!selectedClientId) return toast.warning('Сначала выберите клиента!');
     const membership = clients.find(c => c.id === selectedClientId)?.memberships?.[0];
-    if (!membership) return toast.error('Нет активного абонемента');
+    if (!membership) return toast.error('У выбранного клиента нет активного абонемента!');
     try {
-      const res = await api.put(`/membership/${membership.id}/renew`);
-      toast.success(res.data.message); setSelectedClientId(null); loadAdminData();
+      const res = await api.put(`/membership/${membership.id}/renew`, { visits: visitsCount });
+      toast.success(res.data.message); 
+      setSelectedClientId(null); 
+      loadAdminData();
     } catch (err) { toast.error('Ошибка при продлении абонемента'); }
   };
 
+  // Обнуление (аннулирование) абонемента
+  const handleResetMembership = async () => {
+    if (!selectedClientId) return toast.warning('Сначала выберите клиента!');
+    const membership = clients.find(c => c.id === selectedClientId)?.memberships?.[0];
+    if (!membership) return toast.error('У выбранного клиента нет активного абонемента!');
+    if (!window.confirm('Вы действительно хотите обнулить оставшиеся занятия и деактивировать абонемент этого клиента?')) {
+      return;
+    }
+    try {
+      const res = await api.put(`/membership/${membership.id}/reset`);
+      toast.success(res.data.message); 
+      setSelectedClientId(null); 
+      loadAdminData();
+    } catch (err) { toast.error('Ошибка при обнулении абонемента'); }
+  };
+
+  const handleIssueMembership = async (e) => {
+    e.preventDefault();
+    if (!selectedClientId) return toast.warning('Сначала выберите клиента из списка ниже!');
+    try {
+      await api.post('/membership', {
+        user_id: selectedClientId,
+        type: mType,
+        start_date: mStartDate,
+        end_date: mEndDate,
+        visits_total: mVisits
+      });
+      toast.success('Новый абонемент успешно выдан клиенту!');
+      setShowIssueForm(false);
+      setMStartDate(''); setMEndDate('');
+      setSelectedClientId(null);
+      loadAdminData();
+    } catch (err) {
+      toast.error('Не удалось выдать новый абонемент');
+    }
+  };
+
   if (loading) return <div className="text-center p-8">Загрузка...</div>;
+
+  const currentSelectedClient = clients.find(c => c.id === selectedClientId);
 
   return (
     <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="space-y-8 w-full">
@@ -744,6 +1132,70 @@ function AdminPage() {
           <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 flex items-center justify-between"><div><p className="text-xs font-bold text-slate-400 uppercase">Выручка</p><p className="text-3xl font-black text-orange-600 mt-2">{stats.revenueEstimate} ₽</p></div><div className="w-12 h-12 bg-orange-50 text-orange-600 rounded-2xl flex items-center justify-center font-bold"><Activity size={20} /></div></div>
         </div>
       )}
+
+      {selectedClientId && (
+        <motion.div initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }} className="bg-slate-900 text-white p-6 rounded-3xl flex flex-col md:flex-row justify-between items-center gap-4">
+          <div>
+            <p className="text-xs font-bold text-slate-400 uppercase">Выбранный клиент:</p>
+            <h4 className="font-bold text-xl">{currentSelectedClient?.full_name}</h4>
+            <p className="text-xs text-slate-300">Текущий абонемент: {currentSelectedClient?.memberships?.[0]?.type || 'Отсутствует'}</p>
+          </div>
+          <div className="flex gap-2">
+            <button 
+              onClick={() => setShowIssueForm(!showIssueForm)}
+              className="bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs py-2 px-5 rounded-2xl transition"
+            >
+              {showIssueForm ? 'Скрыть выдачу' : 'Выдать новый абонемент'}
+            </button>
+            {currentSelectedClient?.memberships?.[0] && (
+              <>
+                <button 
+                  onClick={() => handleRenewMembership(12)}
+                  className="bg-green-600 hover:bg-green-700 text-white font-bold text-xs py-2 px-5 rounded-2xl transition"
+                >
+                  Продлить (+12)
+                </button>
+                <button 
+                  onClick={() => handleRenewMembership(6)}
+                  className="bg-teal-600 hover:bg-teal-700 text-white font-bold text-xs py-2 px-5 rounded-2xl transition"
+                >
+                  Продлить (+6)
+                </button>
+                <button 
+                  onClick={handleResetMembership}
+                  className="bg-red-600 hover:bg-red-700 text-white font-bold text-xs py-2 px-5 rounded-2xl transition"
+                >
+                  Обнулить абонемент
+                </button>
+              </>
+            )}
+          </div>
+        </motion.div>
+      )}
+
+      <AnimatePresence>
+        {showIssueForm && selectedClientId && (
+          <motion.form 
+            initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }}
+            onSubmit={handleIssueMembership} className="bg-white p-8 rounded-3xl shadow-sm border border-slate-100 grid grid-cols-1 md:grid-cols-2 gap-4"
+          >
+            <div className="md:col-span-2"><h3 className="font-bold text-slate-800 text-lg">Выдача нового абонемента</h3></div>
+            <div>
+              <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Тип абонемента</label>
+              <select value={mType} onChange={e=>{setMType(e.target.value); setMVisits(e.target.value.includes('Безлимит') ? 999 : 12);}} className="w-full p-3 bg-slate-50 rounded-xl outline-none text-sm">
+                <option value="Классический (12 занятий)">Классический (12 занятий)</option>
+                <option value="Разовый (8 занятий)">Разовый (8 занятий)</option>
+                <option value="Безлимит">Безлимит</option>
+              </select>
+            </div>
+            <div><label className="block text-xs font-bold text-slate-400 uppercase mb-1">Количество визитов</label><input type="number" value={mVisits} onChange={e=>setMVisits(e.target.value)} required min="1" className="w-full p-3 bg-slate-50 rounded-xl outline-none text-sm" /></div>
+            <div><label className="block text-xs font-bold text-slate-400 uppercase mb-1">Дата старта</label><input type="date" value={mStartDate} onChange={e=>setMStartDate(e.target.value)} required className="w-full p-3 bg-slate-50 rounded-xl outline-none text-sm" /></div>
+            <div><label className="block text-xs font-bold text-slate-400 uppercase mb-1">Дата окончания</label><input type="date" value={mEndDate} onChange={e=>setMEndDate(e.target.value)} required className="w-full p-3 bg-slate-50 rounded-xl outline-none text-sm" /></div>
+            <div className="md:col-span-2 flex justify-end"><button type="submit" className="bg-blue-600 text-white font-black px-6 py-3 rounded-2xl text-xs hover:bg-blue-700 transition">Оформить и выдать</button></div>
+          </motion.form>
+        )}
+      </AnimatePresence>
+
       <input type="text" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="Поиск клиента..." className="w-full p-3 border border-slate-200 rounded-2xl text-sm outline-none bg-white shadow-sm" />
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         <div className="lg:col-span-2 bg-white rounded-3xl p-8 shadow-sm border border-slate-100">
@@ -760,7 +1212,6 @@ function AdminPage() {
               ))}
             </tbody>
           </table>
-          <button onClick={handleRenewMembership} className="mt-6 w-full bg-blue-600 text-white font-bold py-3 rounded-xl hover:bg-blue-700 transition">Продлить абонемент (+12)</button>
         </div>
         <div className="bg-slate-900 rounded-3xl p-8 text-white flex flex-col justify-between">
           <div><h3 className="text-lg font-bold">Выгрузка отчетов</h3><p className="text-slate-400 text-xs mt-2">Экспорт CSV для Excel.</p></div>
@@ -771,7 +1222,6 @@ function AdminPage() {
   );
 }
 
-// === ГЛАВНЫЙ СБОРЩИК (App) ===
 export default function App() {
   const [token, setToken] = useState(localStorage.getItem('token'));
   const [user, setUser] = useState(JSON.parse(localStorage.getItem('user')));
@@ -782,7 +1232,7 @@ export default function App() {
 
   useEffect(() => {
     api.get('/workout').then(res => setWorkouts(res.data)).catch(console.error);
-  }, []);
+  }, [token]);
 
   useEffect(() => {
     if (token) {
@@ -799,7 +1249,18 @@ export default function App() {
       localStorage.setItem('user', JSON.stringify(res.data.user));
       setToken(res.data.token); setUser(res.data.user);
       toast.success(`Рады видеть вас, ${res.data.user.full_name}!`);
-    } catch (err) { setError(err.response?.data?.message || 'Ошибка'); }
+    } catch (err) { setError(err.response?.data?.message || 'Ошибка входа'); }
+  };
+
+  const handleRegister = async (e, username, password, fullName, phone) => {
+    e.preventDefault(); setError('');
+    try {
+      const res = await api.post('/user/register', { username, password, full_name: fullName, phone });
+      localStorage.setItem('token', res.data.token);
+      localStorage.setItem('user', JSON.stringify(res.data.user));
+      setToken(res.data.token); setUser(res.data.user);
+      toast.success(`Регистрация завершена! Рады вас приветствовать, ${res.data.user.full_name}!`);
+    } catch (err) { setError(err.response?.data?.message || 'Ошибка регистрации'); }
   };
 
   const handleLogout = () => {
@@ -819,7 +1280,6 @@ export default function App() {
   return (
     <Router>
       <Routes>
-        {/* ПУБЛИЧНАЯ ЗОНА (Сайт-витрина) */}
         <Route path="/" element={
           <div className="min-h-screen bg-white font-sans flex flex-col">
             <Navbar token={token} user={user} handleLogout={handleLogout} />
@@ -834,19 +1294,15 @@ export default function App() {
             <Footer />
           </div>
         } />
-
-        {/* СТРАНИЦА ЛОГИНА */}
         <Route path="/login" element={
-          token ? <Navigate to="/cabinet" /> : <LoginPage handleLogin={handleLogin} error={error} />
+          token ? <Navigate to="/cabinet" /> : <LoginPage handleLogin={handleLogin} handleRegister={handleRegister} error={error} />
         } />
-
-        {/* ПРИВАТНАЯ ЗОНА (Личные кабинеты с боковым меню) */}
         <Route path="/cabinet" element={
           !token ? <Navigate to="/login" /> : (
             <CabinetLayout user={user} handleLogout={handleLogout}>
               {user.role === 'admin' ? <AdminPage /> : 
                user.role === 'trainer' ? <TrainerPage user={user} workouts={workouts} /> : 
-               <ClientDashboard user={user} membership={membership} bookings={bookings} workouts={workouts} handleBook={handleBook} />}
+               <ClientDashboard user={user} membership={membership} bookings={bookings} workouts={workouts} handleBook={handleBook} setMembership={setMembership} setBookings={setBookings} />}
             </CabinetLayout>
           )
         } />
